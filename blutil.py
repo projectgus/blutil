@@ -5,12 +5,13 @@
 import argparse, serial, time, subprocess, sys, os, re
 
 parser = argparse.ArgumentParser(description='Perform various operations with BL600-SA')
-parser.add_argument('-p', '--port', required=True)
-parser.add_argument('-m', '--model')
-parser.add_argument('-b', '--baud', type=int, default=9600)
-parser.add_argument('-c', '--compile', action="store_true")
-parser.add_argument('-l', '--load', action="store_true")
-parser.add_argument('-r', '--run', action="store_true")
+parser.add_argument('-p', '--port', required=True, help="Serial port to connect to")
+parser.add_argument('-m', '--model', help="Specify (instead of detecting) the model number, see command output for example model string")
+parser.add_argument('-b', '--baud', type=int, default=9600, help="Baud rate for connection")
+parser.add_argument('--no-dtr', action="store_true", help="Don't toggle the DTR line as a reset")
+parser.add_argument('-c', '--compile', action="store_true", help="Compile specified smartBasic file")
+parser.add_argument('-l', '--load', action="store_true", help="Upload specified smartBasic file to BL600")
+parser.add_argument('-r', '--run', action="store_true", help="Execute specified smartBasic file on BL600")
 parser.add_argument("filepath", metavar="BASICFILE")
 
 class RuntimeError(Exception):
@@ -110,6 +111,12 @@ def main():
     if len(ops) == 0:
         print("Nothing to do! Choose one of --compile, --load or --run, or chain them ie -clr")
         sys.exit(1)
+
+    if (args.load or args.run or args.model is None) and not args.no_dtr:
+        print("Resetting board via DTR...")
+        device.port.setDTR(False)
+        time.sleep(0.1)
+        device.port.setDTR(True)
 
     if args.model is not None:
         device.model = args.model.replace(" ", "_")
