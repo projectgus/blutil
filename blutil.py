@@ -2,17 +2,20 @@
 """
 """
 
-import argparse, serial, time, subprocess, sys, os, re
+import argparse, serial, time, subprocess, sys, os, re, tempfile
 
-parser = argparse.ArgumentParser(description='Perform various operations with BL600-SA')
+parser = argparse.ArgumentParser(description='Perform various operations with a BL600 module.')
 parser.add_argument('-p', '--port', required=True, help="Serial port to connect to")
 parser.add_argument('-m', '--model', help="Specify (instead of detecting) the model number, see command output for example model string")
 parser.add_argument('-b', '--baud', type=int, default=9600, help="Baud rate for connection")
 parser.add_argument('--no-dtr', action="store_true", help="Don't toggle the DTR line as a reset")
-parser.add_argument('-c', '--compile', action="store_true", help="Compile specified smartBasic file")
-parser.add_argument('-l', '--load', action="store_true", help="Upload specified smartBasic file to BL600")
-parser.add_argument('-r', '--run', action="store_true", help="Execute specified smartBasic file on BL600")
-parser.add_argument("filepath", metavar="BASICFILE")
+alts = parser.add_mutually_exclusive_group(required=True)
+alts.add_argument('-c', '--compile', help="Compile specified smartBasic file to a .uwc file.", metavar="BASICFILE")
+alts.add_argument('-l', '--load', help="Upload specified smartBasic file to BL600 (if argument is a .sb file it will be compiled first.)", metavar="FILE")
+alts.add_argument('-r', '--run', help="Execute specified smartBasic file on BL600 (if argument is a .sb file it will be compiled and uploaded first, if argument is a .uwc file it will be uploaded first.)", metavar="FILE")
+alts.add_argument('--ls', action="store_true", help="List all files uploaded to the BL600")
+alts.add_argument('--rm', metavar="FILE", help="Remove specified file from the BL600")
+alts.add_argument('--format', action="store_true", help="Erase all stored files from the BL600")
 
 class RuntimeError(Exception):
     pass
@@ -33,9 +36,11 @@ class BLDevice(object):
             return str(response, "ascii")[:-3].strip()
         else:
             if len(response) == 0:
-                raise RuntimeError("Got no response to command '%s'" % args)
+                raise RuntimeError("Got no response to command 'AT%s'. Not connected or not in interactive mode?" % args)
+            elif len(response) > 4 and response[0:4] == b'\n01\t':
+                raise RuntimeError("BL600 returned error %s" % response[4:].decode())
             else:
-                raise RuntimeError("Got unexpected/error response to command '%s': %s" % (args,response))
+                raise RuntimeError("Got unexpected/error response to command 'AT%s': %s" % (args,response))
 
     def read_param(self, param):
         return self.writecmd("I %d"%param).split("\t")[-1]
@@ -47,8 +52,11 @@ class BLDevice(object):
         self.model = "%s_%s" % (model, revision.replace(" ","_"))
 
     def compile(self, filepath):
-        compiler = "XComp_%s.exe" % (self.model,)
-        print("Compiling %s with %s..." % (filepath, compiler))
+        blutil_dir = os.path.dirname(sys.argv[0])
+        compiler = os.path.join(blutil_dir, "XComp_%s.exe" % (self.model,))
+        if not os.path.exists(compiler):
+            raise RuntimeError("Compiler not found at %s. Have you downloaded UWTerminal and unzipped the files into blutil.py dir?" % compiler)
+        print("Compiling %s with %s..." % (filepath, os.path.basename(compiler)))
         args = [ compiler, filepath ]
         if os.name != 'nt':
             args = [ "wine" ] + args
@@ -74,14 +82,39 @@ class BLDevice(object):
 
     def run(self, filepath):
         devicename = get_devicename(filepath)
+        self.writecmd('') # check is responding at all
         print("Running %s..." % devicename)
         self.writecmd('+RUN "%s"' % devicename, expect_response=False)
         output = self.port.read(1024)
         if len(output):
-            print("Immediate output:\n%s" % output)
+            if len(output) > 4 and output[0:4] == b'\n01\t':
+                print("Error: %s" % output[4:].decode())
+            elif output != b'\n00':
+                print("Immediate output:\n%s" % output)
+            else:
+                print("Program ran successfully.")
         else:
             print("No immediate output, program probably running...")
 
+    def list(self):
+        print("Listing files...")
+        output = self.writecmd('+DIR')
+        print(output)
+
+    def delete(self, filename):
+        filename = get_devicename(filename)
+        print("Removing %s..." % filename)
+        self.writecmd('+DEL "%s"' % filename)
+        print("Deleted.")
+
+    def format(self):
+        print("Formatting BL600...")
+        self.writecmd('')
+        self.writecmd('&F 1', expect_response=False)
+        time.sleep(0.2)
+        self.port.read(1024) # discard anything
+        print("Format complete. Reconnecting...")
+        self.writecmd('')
 
 def chunks(somefile, chunklen):
     while True:
@@ -96,9 +129,33 @@ def get_devicename(filepath):
     filename = os.path.splitext(filename)[0]
     return re.sub(r'[:*?"<>|]', "", filename)[:24]
 
+def test_wine():
+    """ Check the wine installation is OK """
+    try:
+        with tempfile.TemporaryFile() as blackhole:
+            ret = subprocess.call(["wine", "--version"], stdin=None, stdout=blackhole, stderr=None, shell=False)
+        if ret != 0:
+            raise RuntimeError("Wine returned error code" % ret)
+    except e:
+        print("Wine execution failed. %s. Make sure wine is in your path and properly configured" % e)
+        sys.exit(2)
+
 def main():
+    test_wine()
     args = parser.parse_args()
     device = BLDevice(args)
+
+    # Preload any .sb or .uwc file
+    if args.run is not None:
+        split = os.path.splitext(args.run)
+        if split[1] == ".uwc" or split[1] == ".sb":
+            args.load = args.run
+
+    # Precompile any .sb file
+    if args.load is not None:
+        split = os.path.splitext(args.load)
+        if split[1] == ".sb":
+            args.compile = args.load
 
     ops = []
     if args.compile:
@@ -108,11 +165,7 @@ def main():
     if args.run:
         ops += [ "run" ]
 
-    if len(ops) == 0:
-        print("Nothing to do! Choose one of --compile, --load or --run, or chain them ie -clr")
-        sys.exit(1)
-
-    if (args.load or args.run or args.model is None) and not args.no_dtr:
+    if (args.load or args.run or args.rm or args.ls or args.format or args.model is None) and not args.no_dtr:
         print("Resetting board via DTR...")
         device.port.setDTR(False)
         time.sleep(0.1)
@@ -123,14 +176,21 @@ def main():
     elif args.compile:
         device.detect_model()
 
-    print("Performing %s for %s" % (", ".join(ops), args.filepath))
+    if len(ops) > 0:
+        print("Performing %s for %s..." % (", ".join(ops), sys.argv[-1]))
 
+    if args.ls:
+        device.list()
+    if args.rm:
+        device.delete(args.rm)
+    if args.format:
+        device.format()
     if args.compile:
-        device.compile(args.filepath)
+        device.compile(args.compile)
     if args.load:
-        device.upload(args.filepath)
+        device.upload(args.load)
     if args.run:
-        device.run(args.filepath)
+        device.run(args.run)
 
 if __name__ == "__main__":
     try:
