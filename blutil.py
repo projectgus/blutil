@@ -87,12 +87,14 @@ class BLDevice(object):
         self.writecmd('+RUN "%s"' % devicename, expect_response=False)
         output = self.port.read(1024)
         if len(output):
-            if len(output) > 4 and output[0:4] == b'\n01\t':
+            if len(output) >= 3 and output[-3:] == b'00\r':
+                if len(output) > 3:
+                    print("Output:\n%s" % output[:-3].decode())
+                print("Program completed successfully.")
+            elif len(output) > 4 and output[0:4] == b'\n01\t':
                 print("Error: %s" % output[4:].decode())
             elif output != b'\n00':
                 print("Immediate output:\n%s" % output)
-            else:
-                print("Program ran successfully.")
         else:
             print("No immediate output, program probably running...")
 
