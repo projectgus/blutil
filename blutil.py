@@ -143,7 +143,8 @@ def test_wine():
         sys.exit(2)
 
 def main():
-    test_wine()
+    if os.name != 'nt':
+        test_wine()
     args = parser.parse_args()
     device = BLDevice(args)
 
