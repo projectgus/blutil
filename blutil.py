@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """
+blutil.py is a command line tool for programming BL-600SA "SmartBASIC" devices.
+
+See http://projectgus.com/2014/03/laird-bl600-modules for more details
+
+Copyright (C)2014 Angus Gratton, released under BSD license as per the LICENSE file.
 """
 
 import argparse, serial, time, subprocess, sys, os, re, tempfile
