@@ -133,7 +133,7 @@ def chunks(somefile, chunklen):
 def get_devicename(filepath):
     """ Given a file path, find an acceptable name on the BL filesystem """
     filename = os.path.split(filepath)[1]
-    filename = os.path.splitext(filename)[0]
+    filename = filename.split('.')[0]
     return re.sub(r'[:*?"<>|]', "", filename)[:24]
 
 def test_wine():
