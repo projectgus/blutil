@@ -61,6 +61,8 @@ class BLDevice(object):
         compiler = os.path.join(blutil_dir, "XComp_%s.exe" % (self.model,))
         if not os.path.exists(compiler):
             raise RuntimeError("Compiler not found at %s. Have you downloaded UWTerminal and unzipped the files into blutil.py dir?" % compiler)
+        if not os.path.exists(filepath):
+            raise RuntimeError("File '%s' not found" % filepath)
         print("Compiling %s with %s..." % (filepath, os.path.basename(compiler)))
         args = [ compiler, filepath ]
         if os.name != 'nt':
