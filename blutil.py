@@ -10,18 +10,18 @@ Copyright (C)2014 Angus Gratton, released under BSD license as per the LICENSE f
 import argparse, serial, time, subprocess, sys, os, re, tempfile
 
 parser = argparse.ArgumentParser(description='Perform various operations with a BL600 module. The -m option can only be used instead of -p when compiling using the -c flag. -p on the other hand is compatible with all other argument choices.')
-alts1 = parser.add_mutually_exclusive_group(required=True)
-alts1.add_argument('-p', '--port', help="Serial port to connect to")
-alts1.add_argument('-m', '--model', help="Specify (instead of detecting) the model number, see command output for example model string")
+device_arg = parser.add_mutually_exclusive_group(required=True)
+device_arg.add_argument('-p', '--port', help="Serial port to connect to")
+device_arg.add_argument('-m', '--model', help="Specify (instead of detecting) the model number, see command output for example model string")
 parser.add_argument('-b', '--baud', type=int, default=9600, help="Baud rate for connection")
 parser.add_argument('--no-dtr', action="store_true", help="Don't toggle the DTR line as a reset")
-alts2 = parser.add_mutually_exclusive_group(required=True)
-alts2.add_argument('-c', '--compile', help="Compile specified smartBasic file to a .uwc file.", metavar="BASICFILE")
-alts2.add_argument('-l', '--load', help="Upload specified smartBasic file to BL600 (if argument is a .sb file it will be compiled first.)", metavar="FILE")
-alts2.add_argument('-r', '--run', help="Execute specified smartBasic file on BL600 (if argument is a .sb file it will be compiled and uploaded first, if argument is a .uwc file it will be uploaded first.)", metavar="FILE")
-alts2.add_argument('--ls', action="store_true", help="List all files uploaded to the BL600")
-alts2.add_argument('--rm', metavar="FILE", help="Remove specified file from the BL600")
-alts2.add_argument('--format', action="store_true", help="Erase all stored files from the BL600")
+cmd_arg = parser.add_mutually_exclusive_group(required=True)
+cmd_arg.add_argument('-c', '--compile', help="Compile specified smartBasic file to a .uwc file.", metavar="BASICFILE")
+cmd_arg.add_argument('-l', '--load', help="Upload specified smartBasic file to BL600 (if argument is a .sb file it will be compiled first.)", metavar="FILE")
+cmd_arg.add_argument('-r', '--run', help="Execute specified smartBasic file on BL600 (if argument is a .sb file it will be compiled and uploaded first, if argument is a .uwc file it will be uploaded first.)", metavar="FILE")
+cmd_arg.add_argument('--ls', action="store_true", help="List all files uploaded to the BL600")
+cmd_arg.add_argument('--rm', metavar="FILE", help="Remove specified file from the BL600")
+cmd_arg.add_argument('--format', action="store_true", help="Erase all stored files from the BL600")
 
 class RuntimeError(Exception):
     pass
