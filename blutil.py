@@ -45,7 +45,7 @@ class BLDevice(object):
             if len(response) == 0:
                 raise RuntimeError("Got no response to command 'AT%s'. Not connected or not in interactive mode?" % args)
             elif len(response) > 4 and response[0:4] == b'\n01\t':
-                errorcode = response[4:].decode()
+                errorcode = str(response[4:].decode())[:-1]
                 raise RuntimeError("BL600 returned error %s: %s" % (errorcode,get_errordesc(errorcode)))
             else:
                 raise RuntimeError("Got unexpected/error response to command 'AT%s': %s" % (args,response))
@@ -102,7 +102,7 @@ class BLDevice(object):
                     print("Output:\n%s" % output[:-3].decode())
                 print("Program completed successfully.")
             elif len(output) > 4 and output[0:4] == b'\n01\t':
-                errorcode = output[4:].decode()
+                errorcode = str(response[4:].decode())[:-1]
                 print("Error %s: %s" % (errorcode,get_errordesc(errorcode)))
             elif output != b'\n00':
                 print("Immediate output:\n%s" % output)
@@ -155,11 +155,12 @@ def test_wine():
 
 def get_errordesc(code):
     """ Go through file with list of error codes to find description """
-    f = open(codes.csv)
+    f = open("codes.csv")
     for line in f:
-	if code in line:
+        if str(eval("0x"+code)) in line:
             return line.split('"')[1]
             break
+    return "(no description available)"
 
 def main():
     if os.name != 'nt':
