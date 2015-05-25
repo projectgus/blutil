@@ -155,12 +155,13 @@ def test_wine():
 
 def get_errordesc(code):
     """ Go through file with list of error codes to find description """
-    f = open("codes.csv")
-    for line in f:
-        if str(eval("0x"+code)) in line:
-            return line.split('"')[1]
-            break
-    return "(no description available)"
+    blutil_dir = os.path.dirname(sys.argv[0])
+    with open(os.path.join(blutil_dir, 'codes.csv')) as f:
+        for line in f:
+            if str(eval("0x"+code)) in line:
+                return line.split('"')[1]
+                break
+        return "(no description available)"
 
 def main():
     if os.name != 'nt':

@@ -1,3 +1,4 @@
+# Contents Copyright (C) Laird PLC
 [General]
 512="GENERIC_FAIL,There is a generic error whilst attempting to store a string due to it's length."
 513="MALLOC_FAIL,An error occured whilst trying to allocate memory, there is insufficient memory on the device for this operation."
